@@ -10,9 +10,12 @@ const COMPANY_ID = "demo-company"; // later dynamic
     return new Promise((resolve, reject) => {
       const existing = document.querySelector(`script[src="${src}"]`);
       if (existing) {
+        if (existing.dataset.loaded === "true") {
+          resolve();
+          return;
+        }
         existing.addEventListener("load", resolve, { once: true });
         existing.addEventListener("error", reject, { once: true });
-        if (existing.dataset.loaded === "true") resolve();
         return;
       }
 
@@ -73,9 +76,6 @@ const COMPANY_ID = "demo-company"; // later dynamic
     params.get("companyName") ||
     "Demo Company";
 
-  const CUSTOMER_NAME_EL = document.getElementById("customerName");
-  if (CUSTOMER_NAME_EL) CUSTOMER_NAME_EL.textContent = COMPANY_NAME;
-
   // ---------- FALLBACK ROLE LIST ----------
   const FALLBACK_ROLE_DEFINITIONS = [
     "Team Lead",
@@ -103,6 +103,7 @@ const COMPANY_ID = "demo-company"; // later dynamic
   const circleMainLabel = document.getElementById("circleMainLabel");
   const circleSubLabel = document.getElementById("circleSubLabel");
   const hintText = document.getElementById("hintText");
+  const customerNameEl = document.getElementById("customerName");
 
   const lockOverlay = document.getElementById("lockOverlay");
   const lockUserId = document.getElementById("lockUserId");
@@ -116,8 +117,9 @@ const COMPANY_ID = "demo-company"; // later dynamic
   let currentCaller = { firstName: "", lastName: "", uid: "" };
   let roleDefinitions = [...FALLBACK_ROLE_DEFINITIONS];
 
-  // ---------- INIT ----------
-  document.addEventListener("DOMContentLoaded", async () => {
+  async function init() {
+    if (customerNameEl) customerNameEl.textContent = COMPANY_NAME;
+
     await loadCallableRoles();
     buildRoles();
     setCallState("idle");
@@ -126,7 +128,7 @@ const COMPANY_ID = "demo-company"; // later dynamic
     updateSendButton();
     wireKeypad();
     listenForStationCallState();
-  });
+  }
 
   async function loadCallableRoles() {
     try {
@@ -144,6 +146,8 @@ const COMPANY_ID = "demo-company"; // later dynamic
   }
 
   function buildRoles() {
+    if (!rolesGrid) return;
+
     rolesGrid.innerHTML = "";
 
     roleDefinitions.forEach(label => {
@@ -171,12 +175,15 @@ const COMPANY_ID = "demo-company"; // later dynamic
   }
 
   function updateSendButton() {
+    if (!sendCallBtn) return;
     const canSend = !isLocked && selectedRoles.length > 0 && callState === "idle";
     sendCallBtn.disabled = !canSend;
   }
 
   function setCallState(state) {
     callState = state;
+
+    if (!circleMainLabel || !circleSubLabel || !hintText) return;
 
     if (state === "idle") {
       circleMainLabel.textContent = "Roles";
@@ -197,6 +204,8 @@ const COMPANY_ID = "demo-company"; // later dynamic
   }
 
   function updateLockVisuals() {
+    if (!stationStatus || !signInBtn) return;
+
     if (isLocked) {
       stationStatus.textContent = "Locked";
       stationStatus.classList.remove("status-ready");
@@ -243,7 +252,7 @@ const COMPANY_ID = "demo-company"; // later dynamic
         .sort((a, b) => (b.timeStarted || 0) - (a.timeStarted || 0))[0];
 
       if (!active) {
-        if (!lockOverlay.classList.contains("hidden")) return;
+        if (lockOverlay && !lockOverlay.classList.contains("hidden")) return;
         if (!isLocked) {
           setCallState("idle");
           updateSendButton();
@@ -257,7 +266,7 @@ const COMPANY_ID = "demo-company"; // later dynamic
     });
   }
 
-  sendCallBtn.addEventListener("click", async () => {
+  sendCallBtn?.addEventListener("click", async () => {
     if (sendCallBtn.disabled) return;
 
     const existing = await findActiveCallForStation();
@@ -305,6 +314,8 @@ const COMPANY_ID = "demo-company"; // later dynamic
   signInBtn?.addEventListener("click", () => openLockOverlay());
 
   function openLockOverlay() {
+    if (!lockOverlay || !lockUserId || !lockPin) return;
+
     lockUserId.value = "";
     lockPin.value = "";
     activeLockField = "user";
@@ -321,6 +332,7 @@ const COMPANY_ID = "demo-company"; // later dynamic
 
       btn.addEventListener("click", () => {
         const target = activeLockField === "user" ? lockUserId : lockPin;
+        if (!target) return;
 
         if (key) {
           if (target.value.length < 4) target.value += key;
@@ -334,8 +346,8 @@ const COMPANY_ID = "demo-company"; // later dynamic
   }
 
   unlockBtn?.addEventListener("click", async () => {
-    const uid = lockUserId.value.trim();
-    const pin = lockPin.value.trim();
+    const uid = lockUserId?.value.trim() || "";
+    const pin = lockPin?.value.trim() || "";
 
     if (uid.length < 2 || pin.length < 2) {
       alert("Enter valid ID + PIN");
@@ -384,7 +396,7 @@ const COMPANY_ID = "demo-company"; // later dynamic
       selectedRoles = [];
       document.querySelectorAll(".role-pill").forEach(p => p.classList.remove("selected"));
 
-      lockOverlay.classList.add("hidden");
+      if (lockOverlay) lockOverlay.classList.add("hidden");
       setCallState("idle");
       updateLockVisuals();
       updateSendButton();
@@ -393,4 +405,10 @@ const COMPANY_ID = "demo-company"; // later dynamic
       alert("Unable to verify user right now.");
     }
   });
+
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", init, { once: true });
+  } else {
+    init();
+  }
 })();
