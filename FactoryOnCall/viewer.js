@@ -2,6 +2,7 @@
    FACTORY ON CALL — VIEWER
    Unified Firestore Version
 -------------------------------------------------- */
+const COMPANY_ID = "demo-company"; // later dynamic
 
 (async function () {
   async function loadScript(src) {
@@ -46,6 +47,10 @@
 
   const db = app.firestore();
 
+  // ---- FIRESTORE PATHS ----
+  const companyRef = db.collection("companies").doc(COMPANY_ID);
+  const callsRef = companyRef.collection("calls");
+
   let viewerIsAdmin = true;
 
   const activeCalls = document.getElementById("activeCalls");
@@ -79,7 +84,7 @@
   document.addEventListener("DOMContentLoaded", () => {
     setConn(false);
 
-    db.collection("calls").onSnapshot(snapshot => {
+    callsRef.onSnapshot(snapshot => {
       setConn(true);
 
       const allCalls = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
@@ -92,7 +97,9 @@
       sbActive.textContent = String(openCalls.length);
       sbWaiting.textContent = String(openCalls.filter(c => c.status === "waiting").length);
       sbOnWay.textContent = String(openCalls.filter(c => c.status === "ack").length);
-      sbClosed.textContent = String(allCalls.filter(c => c.status === "closed" && isToday(c.timeClosed || c.timeStarted)).length);
+      sbClosed.textContent = String(
+        allCalls.filter(c => c.status === "closed" && isToday(c.timeClosed || c.timeStarted)).length
+      );
     }, err => {
       console.error(err);
       setConn(false);
@@ -104,11 +111,10 @@
 
     calls.forEach(call => {
       const minutesAgo = fmtMinutesAgo(call.timeStarted);
+      const ackText = call.ackBy ? `Ack: ${call.ackBy}` : "Waiting…";
 
       const card = document.createElement("div");
       card.className = "call-card";
-
-      const ackText = call.ackBy ? `Ack: ${call.ackBy}` : "Waiting…";
 
       card.innerHTML = `
         <div class="call-row">
@@ -136,7 +142,7 @@
         const id = btn.dataset.id;
         if (!id) return;
 
-        await db.collection("calls").doc(id).update({
+        await callsRef.doc(id).update({
           status: "ack",
           ackBy: "ViewerUser",
           assignedTo: "ViewerUser",
@@ -152,7 +158,7 @@
         const id = btn.dataset.id;
         if (!id) return;
 
-        const ref = db.collection("calls").doc(id);
+        const ref = callsRef.doc(id);
         const snap = await ref.get();
         if (!snap.exists) return;
 
