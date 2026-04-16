@@ -5,7 +5,6 @@
 const COMPANY_ID = "demo-company"; // later dynamic
 
 (async function () {
-  // ---------- LOAD FIREBASE COMPAT IF NEEDED ----------
   async function loadScript(src) {
     return new Promise((resolve, reject) => {
       const existing = document.querySelector(`script[src="${src}"]`);
@@ -36,7 +35,6 @@ const COMPANY_ID = "demo-company"; // later dynamic
     await loadScript("https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js");
   }
 
-  // ---------- FIREBASE INIT ----------
   const firebaseConfig = {
     apiKey: "AIzaSyD5n-Ykf5LoYE_2u0pbRKfektav75GZIZE",
     authDomain: "factoryoncall.firebaseapp.com",
@@ -52,13 +50,11 @@ const COMPANY_ID = "demo-company"; // later dynamic
 
   const db = app.firestore();
 
-  // ---------- FIRESTORE PATHS ----------
   const companyRef = db.collection("companies").doc(COMPANY_ID);
   const rolesRef = companyRef.collection("roles");
   const usersRef = companyRef.collection("users");
   const callsRef = companyRef.collection("calls");
 
-  // ---------- CONFIG FROM URL / FALLBACKS ----------
   const params = new URLSearchParams(window.location.search);
 
   const STATION_NAME =
@@ -76,7 +72,6 @@ const COMPANY_ID = "demo-company"; // later dynamic
     params.get("companyName") ||
     "Demo Company";
 
-  // ---------- FALLBACK ROLE LIST ----------
   const FALLBACK_ROLE_DEFINITIONS = [
     "Team Lead",
     "Supervisor",
@@ -94,7 +89,6 @@ const COMPANY_ID = "demo-company"; // later dynamic
     "Electrician"
   ];
 
-  // ---------- DOM REFS ----------
   const rolesGrid = document.getElementById("rolesGrid");
   const sendCallBtn = document.getElementById("sendCallBtn");
   const signInBtn = document.getElementById("signInBtn");
@@ -118,7 +112,9 @@ const COMPANY_ID = "demo-company"; // later dynamic
   let roleDefinitions = [...FALLBACK_ROLE_DEFINITIONS];
 
   async function init() {
-    if (customerNameEl) customerNameEl.textContent = COMPANY_NAME;
+    if (customerNameEl) {
+      customerNameEl.textContent = `${COMPANY_NAME} · ${STATION_NAME}`;
+    }
 
     await loadCallableRoles();
     buildRoles();
@@ -186,16 +182,18 @@ const COMPANY_ID = "demo-company"; // later dynamic
     if (!circleMainLabel || !circleSubLabel || !hintText) return;
 
     if (state === "idle") {
-      circleMainLabel.textContent = "Roles";
-      circleSubLabel.textContent = "Select then send call";
+      circleMainLabel.textContent = STATION_NAME;
+      circleSubLabel.textContent = STATION_CELLS.length
+        ? `Cells: ${STATION_CELLS.join(", ")}`
+        : "Select then send call";
       hintText.innerHTML =
         `Select one or more roles below, then press <strong>Send Call</strong>.`;
     } else if (state === "pending") {
-      circleMainLabel.textContent = "Call Sent";
+      circleMainLabel.textContent = STATION_NAME;
       circleSubLabel.textContent = "Waiting for acknowledgment";
       hintText.textContent = "Call sent. Waiting for someone to respond.";
     } else if (state === "ack") {
-      circleMainLabel.textContent = "On The Way";
+      circleMainLabel.textContent = STATION_NAME;
       circleSubLabel.textContent = "Acknowledged";
       hintText.textContent = "Someone has accepted this call.";
     }
