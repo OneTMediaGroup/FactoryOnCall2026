@@ -1,4 +1,3 @@
-
 /* -----------------------------------------------------
    FACTORY ON CALL — CALL STATION
    Unified Firestore Version
@@ -50,6 +49,12 @@ const COMPANY_ID = "demo-company"; // later dynamic
 
   const db = app.firestore();
 
+  // ---------- FIRESTORE PATHS ----------
+  const companyRef = db.collection("companies").doc(COMPANY_ID);
+  const rolesRef = companyRef.collection("roles");
+  const usersRef = companyRef.collection("users");
+  const callsRef = companyRef.collection("calls");
+
   // ---------- CONFIG FROM URL / FALLBACKS ----------
   const params = new URLSearchParams(window.location.search);
 
@@ -65,8 +70,8 @@ const COMPANY_ID = "demo-company"; // later dynamic
       .filter(Boolean);
 
   const COMPANY_NAME =
-    params.get("company") ||
-    "Your Company";
+    params.get("companyName") ||
+    "Demo Company";
 
   const CUSTOMER_NAME_EL = document.getElementById("customerName");
   if (CUSTOMER_NAME_EL) CUSTOMER_NAME_EL.textContent = COMPANY_NAME;
@@ -125,10 +130,7 @@ const COMPANY_ID = "demo-company"; // later dynamic
 
   async function loadCallableRoles() {
     try {
-      const snap = await db
-        .collection("roles")
-        .where("isCallable", "==", true)
-        .get();
+      const snap = await rolesRef.where("isCallable", "==", true).get();
 
       if (!snap.empty) {
         roleDefinitions = snap.docs
@@ -209,7 +211,7 @@ const COMPANY_ID = "demo-company"; // later dynamic
   }
 
   async function findActiveCallForStation() {
-    const snap = await db.collection("calls").get();
+    const snap = await callsRef.get();
 
     const activeDocs = snap.docs.filter(doc => {
       const c = doc.data() || {};
@@ -230,8 +232,8 @@ const COMPANY_ID = "demo-company"; // later dynamic
     return activeDocs[0];
   }
 
-  async function listenForStationCallState() {
-    db.collection("calls").onSnapshot(snapshot => {
+  function listenForStationCallState() {
+    callsRef.onSnapshot(snapshot => {
       const active = snapshot.docs
         .map(d => ({ id: d.id, ...d.data() }))
         .filter(c =>
@@ -267,6 +269,7 @@ const COMPANY_ID = "demo-company"; // later dynamic
     }
 
     const payload = {
+      companyId: COMPANY_ID,
       station: STATION_NAME,
       cells: STATION_CELLS,
       roles: selectedRoles,
@@ -286,7 +289,7 @@ const COMPANY_ID = "demo-company"; // later dynamic
       duration: null
     };
 
-    await db.collection("calls").add(payload);
+    await callsRef.add(payload);
 
     if (callPanel) {
       callPanel.classList.add("sending");
@@ -340,7 +343,7 @@ const COMPANY_ID = "demo-company"; // later dynamic
     }
 
     try {
-      const snap = await db.collection("users").get();
+      const snap = await usersRef.get();
 
       const match = snap.docs
         .map(d => d.data())
@@ -370,7 +373,7 @@ const COMPANY_ID = "demo-company"; // later dynamic
           ? Math.max(1, Math.round((timeClosed - data.timeStarted) / 60000))
           : null;
 
-        await db.collection("calls").doc(activeDoc.id).update({
+        await callsRef.doc(activeDoc.id).update({
           status: "closed",
           timeClosed,
           duration
