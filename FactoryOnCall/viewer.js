@@ -9,9 +9,12 @@ const COMPANY_ID = "demo-company"; // later dynamic
     return new Promise((resolve, reject) => {
       const existing = document.querySelector(`script[src="${src}"]`);
       if (existing) {
+        if (existing.dataset.loaded === "true") {
+          resolve();
+          return;
+        }
         existing.addEventListener("load", resolve, { once: true });
         existing.addEventListener("error", reject, { once: true });
-        if (existing.dataset.loaded === "true") resolve();
         return;
       }
 
@@ -62,8 +65,8 @@ const COMPANY_ID = "demo-company"; // later dynamic
   const sbClosed = document.getElementById("sbClosed");
 
   function setConn(ok) {
-    connDot.style.background = ok ? "#22c55e" : "#ef4444";
-    connLabel.textContent = ok ? "Online" : "Offline";
+    if (connDot) connDot.style.background = ok ? "#22c55e" : "#ef4444";
+    if (connLabel) connLabel.textContent = ok ? "Online" : "Offline";
   }
 
   function fmtMinutesAgo(ts) {
@@ -81,32 +84,9 @@ const COMPANY_ID = "demo-company"; // later dynamic
     );
   }
 
-  document.addEventListener("DOMContentLoaded", () => {
-    setConn(false);
-
-    callsRef.onSnapshot(snapshot => {
-      setConn(true);
-
-      const allCalls = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-      const openCalls = allCalls
-        .filter(c => c.status === "waiting" || c.status === "ack")
-        .sort((a, b) => (a.timeStarted || 0) - (b.timeStarted || 0));
-
-      renderCallList(openCalls);
-
-      sbActive.textContent = String(openCalls.length);
-      sbWaiting.textContent = String(openCalls.filter(c => c.status === "waiting").length);
-      sbOnWay.textContent = String(openCalls.filter(c => c.status === "ack").length);
-      sbClosed.textContent = String(
-        allCalls.filter(c => c.status === "closed" && isToday(c.timeClosed || c.timeStarted)).length
-      );
-    }, err => {
-      console.error(err);
-      setConn(false);
-    });
-  });
-
   function renderCallList(calls) {
+    if (!activeCalls) return;
+
     activeCalls.innerHTML = "";
 
     calls.forEach(call => {
@@ -175,5 +155,41 @@ const COMPANY_ID = "demo-company"; // later dynamic
         });
       };
     });
+  }
+
+  function init() {
+    setConn(false);
+
+    callsRef.onSnapshot(
+      snapshot => {
+        setConn(true);
+
+        const allCalls = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+        const openCalls = allCalls
+          .filter(c => c.status === "waiting" || c.status === "ack")
+          .sort((a, b) => (a.timeStarted || 0) - (b.timeStarted || 0));
+
+        renderCallList(openCalls);
+
+        if (sbActive) sbActive.textContent = String(openCalls.length);
+        if (sbWaiting) sbWaiting.textContent = String(openCalls.filter(c => c.status === "waiting").length);
+        if (sbOnWay) sbOnWay.textContent = String(openCalls.filter(c => c.status === "ack").length);
+        if (sbClosed) {
+          sbClosed.textContent = String(
+            allCalls.filter(c => c.status === "closed" && isToday(c.timeClosed || c.timeStarted)).length
+          );
+        }
+      },
+      err => {
+        console.error(err);
+        setConn(false);
+      }
+    );
+  }
+
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", init, { once: true });
+  } else {
+    init();
   }
 })();
