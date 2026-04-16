@@ -129,6 +129,7 @@ const COMPANY_ID = "demo-company"; // later dynamic
 
       card.innerHTML = `
         <div class="call-row">
+          <span class="call-station">${call.station || ""}</span>
           <span class="call-role">${(call.roles || []).join(", ")}</span>
           <span class="call-cell">${(call.cells || []).join(", ") || "—"}</span>
           <span class="call-time">${minutesAgo} min ago</span>
