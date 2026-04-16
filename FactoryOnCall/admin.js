@@ -10,6 +10,11 @@ function setConn(ok) {
 
 setTimeout(() => setConn(true), 500);
 
+// ---- FIRESTORE PATHS ----
+const stationsRef = db
+    .collection("companies")
+    .doc(COMPANY_ID)
+    .collection("stations");
 
 // ---- DOM ELEMENTS ----
 const nameInput = document.getElementById("stationName");
@@ -18,12 +23,15 @@ const rolesInput = document.getElementById("stationRoles");
 const createBtn = document.getElementById("createStationBtn");
 const stationList = document.getElementById("stationList");
 
-
 // ---- CREATE STATION ----
 createBtn.onclick = async () => {
     const name = nameInput.value.trim();
     const cell = cellInput.value.trim();
-    const roles = rolesInput.value.trim().split(",").map(r => r.trim()).filter(r => r.length > 0);
+    const roles = rolesInput.value
+        .trim()
+        .split(",")
+        .map(r => r.trim())
+        .filter(r => r.length > 0);
 
     if (!name || !cell || roles.length === 0) {
         alert("Please fill all fields.");
@@ -31,7 +39,8 @@ createBtn.onclick = async () => {
     }
 
     try {
-        await db.collection("stations").add({
+        await stationsRef.add({
+            companyId: COMPANY_ID,
             name,
             cell,
             roles,
@@ -43,34 +52,38 @@ createBtn.onclick = async () => {
         rolesInput.value = "";
 
         alert("Station created.");
-    }
-    catch (e) {
+    } catch (e) {
         console.error(e);
         alert("Error creating station.");
     }
 };
 
-
 // ---- LOAD STATIONS ----
 function loadStations() {
-    db.collection("stations").orderBy("name").onSnapshot(snap => {
-        stationList.innerHTML = "";
+    stationsRef.orderBy("name").onSnapshot(
+        snap => {
+            stationList.innerHTML = "";
 
-        snap.forEach(doc => {
-            const s = doc.data();
+            snap.forEach(doc => {
+                const s = doc.data();
 
-            const div = document.createElement("div");
-            div.className = "station-row";
+                const div = document.createElement("div");
+                div.className = "station-row";
 
-            div.innerHTML = `
-                <div class="station-name">${s.name}</div>
-                <div class="station-cell">${s.cell}</div>
-                <div class="station-roles">${s.roles.join(", ")}</div>
-            `;
+                div.innerHTML = `
+                    <div class="station-name">${s.name || ""}</div>
+                    <div class="station-cell">${s.cell || ""}</div>
+                    <div class="station-roles">${Array.isArray(s.roles) ? s.roles.join(", ") : ""}</div>
+                `;
 
-            stationList.appendChild(div);
-        });
-    });
+                stationList.appendChild(div);
+            });
+        },
+        err => {
+            console.error("Error loading stations:", err);
+            stationList.innerHTML = `<div class="station-row">Error loading stations.</div>`;
+        }
+    );
 }
 
 loadStations();
