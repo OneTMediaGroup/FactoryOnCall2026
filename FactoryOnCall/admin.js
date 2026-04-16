@@ -1,6 +1,7 @@
 // ---- CONNECTION STATUS ----
 const connDot = document.getElementById("connDot");
 const connLabel = document.getElementById("connLabel");
+const COMPANY_ID = "demo-company"; // later dynamic
 
 function setConn(ok) {
     connDot.style.background = ok ? "#22c55e" : "#ef4444";
