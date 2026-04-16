@@ -53,8 +53,13 @@ const COMPANY_ID = "demo-company"; // later dynamic
   // ---- FIRESTORE PATHS ----
   const companyRef = db.collection("companies").doc(COMPANY_ID);
   const callsRef = companyRef.collection("calls");
+  const usersRef = companyRef.collection("users");
+
+  const params = new URLSearchParams(window.location.search);
+  const viewerUid = params.get("uid") || "";
 
   let viewerIsAdmin = true;
+  let viewerUserName = "ViewerUser";
 
   const activeCalls = document.getElementById("activeCalls");
   const connDot = document.getElementById("connDot");
@@ -82,6 +87,32 @@ const COMPANY_ID = "demo-company"; // later dynamic
       d.getMonth() === now.getMonth() &&
       d.getDate() === now.getDate()
     );
+  }
+
+  async function loadViewerUser() {
+    try {
+      const snap = await usersRef.get();
+      const users = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+
+      let match = null;
+
+      if (viewerUid) {
+        match = users.find(u => String(u.uid || "") === viewerUid && u.active !== false);
+      }
+
+      if (!match) {
+        match = users.find(u => u.active !== false);
+      }
+
+      if (match) {
+        const first = match.firstName || "";
+        const last = match.lastName || "";
+        const full = `${first} ${last}`.trim();
+        viewerUserName = full || "ViewerUser";
+      }
+    } catch (err) {
+      console.error("Could not load viewer user:", err);
+    }
   }
 
   function renderCallList(calls) {
@@ -124,8 +155,8 @@ const COMPANY_ID = "demo-company"; // later dynamic
 
         await callsRef.doc(id).update({
           status: "ack",
-          ackBy: "ViewerUser",
-          assignedTo: "ViewerUser",
+          ackBy: viewerUserName,
+          assignedTo: viewerUserName,
           timeAck: Date.now()
         });
       };
@@ -157,8 +188,9 @@ const COMPANY_ID = "demo-company"; // later dynamic
     });
   }
 
-  function init() {
+  async function init() {
     setConn(false);
+    await loadViewerUser();
 
     callsRef.onSnapshot(
       snapshot => {
