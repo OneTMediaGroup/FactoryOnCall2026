@@ -4,7 +4,6 @@
 -------------------------------------------------- */
 const COMPANY_ID = "demo-company"; // later dynamic
 
-
 (async function () {
   async function loadScript(src) {
     return new Promise((resolve, reject) => {
@@ -48,6 +47,10 @@ const COMPANY_ID = "demo-company"; // later dynamic
 
   const db = app.firestore();
 
+  // ---- FIRESTORE PATHS ----
+  const companyRef = db.collection("companies").doc(COMPANY_ID);
+  const callsRef = companyRef.collection("calls");
+
   const activeCallsEl = document.getElementById("activeCalls");
   const statActive = document.getElementById("statActive");
   const statWaiting = document.getElementById("statWaiting");
@@ -78,7 +81,7 @@ const COMPANY_ID = "demo-company"; // later dynamic
     );
   }
 
-  db.collection("calls").onSnapshot(snapshot => {
+  callsRef.onSnapshot(snapshot => {
     setConn(true);
 
     const allCalls = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
@@ -113,7 +116,9 @@ const COMPANY_ID = "demo-company"; // later dynamic
     statActive.textContent = activeCalls.length;
     statWaiting.textContent = waiting;
     statOnWay.textContent = onWay;
-    statClosed.textContent = allCalls.filter(c => c.status === "closed" && isToday(c.timeClosed || c.timeStarted)).length;
+    statClosed.textContent = allCalls.filter(
+      c => c.status === "closed" && isToday(c.timeClosed || c.timeStarted)
+    ).length;
   }, err => {
     console.error(err);
     setConn(false);
