@@ -3,6 +3,7 @@
    FACTORY ON CALL — CALL STATION
    Unified Firestore Version
 ----------------------------------------------------- */
+const COMPANY_ID = "demo-company"; // later dynamic
 
 (async function () {
   // ---------- LOAD FIREBASE COMPAT IF NEEDED ----------
