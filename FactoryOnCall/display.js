@@ -2,6 +2,8 @@
    FACTORY ON CALL — DISPLAY
    Unified Firestore Version
 -------------------------------------------------- */
+const COMPANY_ID = "demo-company"; // later dynamic
+
 
 (async function () {
   async function loadScript(src) {
