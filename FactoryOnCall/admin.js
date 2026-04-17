@@ -1,6 +1,6 @@
 // -------------------------------------------------------------
 // FACTORY ON CALL — ADMIN PANEL
-// Self-contained admin wired to current admin.html
+// Full Admin: Stations + Call Buttons + Roles + Users
 // -------------------------------------------------------------
 
 const COMPANY_ID = "demo-company";
@@ -56,6 +56,8 @@ const COMPANY_NAME = "Demo Company";
 
   const companyRef = db.collection("companies").doc(COMPANY_ID);
   const stationsRef = companyRef.collection("stations");
+  const rolesRef = companyRef.collection("roles");
+  const usersRef = companyRef.collection("users");
 
   // ---------- CONNECTION STATUS ----------
   const connDot = document.getElementById("firebaseStatusDot");
@@ -170,12 +172,37 @@ const COMPANY_NAME = "Demo Company";
   const cbAutoOutput = document.getElementById("cbAutoOutput");
   const btnGenerateAllDynamic = document.getElementById("btnGenerateAllDynamic");
 
+  const rolesTableBody = document.getElementById("rolesTableBody");
+  const roleForm = document.getElementById("roleForm");
+  const roleId = document.getElementById("roleId");
+  const roleName = document.getElementById("roleName");
+  const roleFormTitle = document.getElementById("roleFormTitle");
+  const roleFormReset = document.getElementById("roleFormReset");
+
+  const usersTableBody = document.getElementById("usersTableBody");
+  const userSearch = document.getElementById("userSearch");
+  const userForm = document.getElementById("userForm");
+  const userId = document.getElementById("userId");
+  const userFirstName = document.getElementById("userFirstName");
+  const userLastName = document.getElementById("userLastName");
+  const userDept = document.getElementById("userDept");
+  const userRole = document.getElementById("userRole");
+  const userUID = document.getElementById("userUID");
+  const userPin = document.getElementById("userPin");
+  const userActive = document.getElementById("userActive");
+  const userFormTitle = document.getElementById("userFormTitle");
+  const userFormReset = document.getElementById("userFormReset");
+
   const statTotalCalls = document.getElementById("statTotalCalls");
   const statActiveCalls = document.getElementById("statActiveCalls");
   const statClosedCalls = document.getElementById("statClosedCalls");
   const dashQuickList = document.getElementById("dashQuickList");
 
+  const permissionCheckboxes = document.querySelectorAll("input[data-permission]");
+
   let cachedStations = [];
+  let cachedRoles = [];
+  let cachedUsers = [];
 
   // ---------- STATIONS ----------
   function renderStations(rows) {
@@ -285,8 +312,167 @@ const COMPANY_NAME = "Demo Company";
     });
   }
 
+  // ---------- ROLES ----------
+  function renderRoles(rows) {
+    if (!rolesTableBody) return;
+
+    rolesTableBody.innerHTML = "";
+
+    rows.forEach(row => {
+      const r = row.data;
+      const permissions = Object.entries(r.permissions || {})
+        .filter(([, value]) => !!value)
+        .map(([key]) => key)
+        .join(", ");
+
+      const tr = document.createElement("tr");
+      tr.innerHTML = `
+        <td>${r.name || ""}${r.isCallable ? " (Callable)" : ""}</td>
+        <td>${permissions || "—"}</td>
+        <td>
+          <button class="btn small secondary edit-role-btn" data-id="${row.id}">Edit</button>
+        </td>
+      `;
+      rolesTableBody.appendChild(tr);
+    });
+
+    wireRoleTableButtons();
+    populateRoleOptions();
+  }
+
+  function wireRoleTableButtons() {
+    document.querySelectorAll(".edit-role-btn").forEach(btn => {
+      btn.onclick = () => {
+        const id = btn.dataset.id;
+        const found = cachedRoles.find(x => x.id === id);
+        if (!found) return;
+
+        const r = found.data;
+        if (roleId) roleId.value = found.id;
+        if (roleName) roleName.value = r.name || "";
+        if (roleFormTitle) roleFormTitle.textContent = "Edit Role";
+
+        permissionCheckboxes.forEach(cb => {
+          const perm = cb.getAttribute("data-permission");
+          cb.checked = !!(r.permissions && r.permissions[perm]);
+        });
+
+        activateTab("roles");
+      };
+    });
+  }
+
+  function resetRoleForm() {
+    if (roleForm) roleForm.reset();
+    if (roleId) roleId.value = "";
+    if (roleFormTitle) roleFormTitle.textContent = "Add Role";
+    permissionCheckboxes.forEach(cb => {
+      cb.checked = false;
+    });
+  }
+
+  function populateRoleOptions() {
+    if (!userRole) return;
+
+    const currentValue = userRole.value;
+    userRole.innerHTML = "";
+
+    cachedRoles
+      .slice()
+      .sort((a, b) => (a.data.name || "").localeCompare(b.data.name || ""))
+      .forEach(row => {
+        const opt = document.createElement("option");
+        opt.value = row.data.name || "";
+        opt.textContent = row.data.name || "";
+        userRole.appendChild(opt);
+      });
+
+    if (currentValue) userRole.value = currentValue;
+  }
+
+  // ---------- USERS ----------
+  function populateDeptOptions() {
+    if (!userDept) return;
+
+    const currentValue = userDept.value;
+    const deptSet = new Set();
+
+    cachedStations.forEach(row => {
+      const desc = row.data.description || "";
+      if (desc) deptSet.add(desc);
+    });
+
+    userDept.innerHTML = "";
+
+    Array.from(deptSet)
+      .sort((a, b) => a.localeCompare(b))
+      .forEach(dept => {
+        const opt = document.createElement("option");
+        opt.value = dept;
+        opt.textContent = dept;
+        userDept.appendChild(opt);
+      });
+
+    if (currentValue) userDept.value = currentValue;
+  }
+
+  function renderUsers(rows) {
+    if (!usersTableBody) return;
+
+    usersTableBody.innerHTML = "";
+
+    rows.forEach(row => {
+      const u = row.data;
+      const tr = document.createElement("tr");
+      tr.innerHTML = `
+        <td>${u.firstName || ""}</td>
+        <td>${u.lastName || ""}</td>
+        <td>${u.email || ""}</td>
+        <td>${u.dept || ""}</td>
+        <td>${u.role || ""}</td>
+        <td>${u.active ? "Yes" : "No"}</td>
+        <td>
+          <button class="btn small secondary edit-user-btn" data-id="${row.id}">Edit</button>
+        </td>
+      `;
+      usersTableBody.appendChild(tr);
+    });
+
+    wireUserTableButtons();
+  }
+
+  function wireUserTableButtons() {
+    document.querySelectorAll(".edit-user-btn").forEach(btn => {
+      btn.onclick = () => {
+        const id = btn.dataset.id;
+        const found = cachedUsers.find(x => x.id === id);
+        if (!found) return;
+
+        const u = found.data;
+        if (userId) userId.value = found.id;
+        if (userFirstName) userFirstName.value = u.firstName || "";
+        if (userLastName) userLastName.value = u.lastName || "";
+        if (userDept) userDept.value = u.dept || "";
+        if (userRole) userRole.value = u.role || "";
+        if (userUID) userUID.value = u.uid || "";
+        if (userPin) userPin.value = u.pin || "";
+        if (userActive) userActive.checked = !!u.active;
+        if (userFormTitle) userFormTitle.textContent = "Edit User";
+        activateTab("users");
+      };
+    });
+  }
+
+  function resetUserForm() {
+    if (userForm) userForm.reset();
+    if (userId) userId.value = "";
+    if (userFormTitle) userFormTitle.textContent = "Add User";
+    if (userActive) userActive.checked = true;
+  }
+
   // ---------- EVENT WIRING ----------
   function wireEvents() {
+    // Stations
     stationForm?.addEventListener("submit", async e => {
       e.preventDefault();
 
@@ -346,6 +532,7 @@ const COMPANY_NAME = "Demo Company";
       renderStations(filtered);
     });
 
+    // Call Buttons
     cbStation?.addEventListener("change", populateCellsForSelectedStation);
 
     btnGenerateDynamic?.addEventListener("click", () => {
@@ -379,6 +566,122 @@ const COMPANY_NAME = "Demo Company";
       const lines = cells.map(cell => buildCallUrl(found.data.name || "", [cell]));
       if (cbAutoOutput) cbAutoOutput.value = lines.join("\n");
     });
+
+    // Roles
+    roleForm?.addEventListener("submit", async e => {
+      e.preventDefault();
+
+      const permissions = {};
+      permissionCheckboxes.forEach(cb => {
+        const perm = cb.getAttribute("data-permission");
+        if (!perm) return;
+        permissions[perm] = cb.checked;
+      });
+
+      const payload = {
+        companyId: COMPANY_ID,
+        name: roleName?.value.trim() || "",
+        permissions,
+        isCallable: !!permissions.makeCall,
+        active: true,
+        updatedAt: Date.now()
+      };
+
+      if (!payload.name) {
+        alert("Role name is required.");
+        return;
+      }
+
+      try {
+        if (roleId?.value) {
+          await rolesRef.doc(roleId.value).update(payload);
+        } else {
+          payload.createdAt = Date.now();
+          await rolesRef.add(payload);
+        }
+
+        resetRoleForm();
+      } catch (err) {
+        console.error(err);
+        alert("Could not save role.");
+      }
+    });
+
+    roleFormReset?.addEventListener("click", resetRoleForm);
+
+    // Users
+    userForm?.addEventListener("submit", async e => {
+      e.preventDefault();
+
+      const payload = {
+        companyId: COMPANY_ID,
+        firstName: userFirstName?.value.trim() || "",
+        lastName: userLastName?.value.trim() || "",
+        email: "",
+        dept: userDept?.value || "",
+        role: userRole?.value || "",
+        uid: userUID?.value.trim() || "",
+        pin: userPin?.value.trim() || "",
+        active: !!userActive?.checked,
+        updatedAt: Date.now()
+      };
+
+      if (!payload.firstName || !payload.lastName) {
+        alert("First and last name are required.");
+        return;
+      }
+
+      if (!payload.uid) {
+        alert("User ID is required.");
+        return;
+      }
+
+      if (!payload.pin) {
+        alert("PIN is required.");
+        return;
+      }
+
+      try {
+        if (userId?.value) {
+          await usersRef.doc(userId.value).update(payload);
+        } else {
+          payload.createdAt = Date.now();
+          await usersRef.add(payload);
+        }
+
+        resetUserForm();
+      } catch (err) {
+        console.error(err);
+        alert("Could not save user.");
+      }
+    });
+
+    userFormReset?.addEventListener("click", resetUserForm);
+
+    userSearch?.addEventListener("input", () => {
+      const q = userSearch.value.trim().toLowerCase();
+      if (!q) {
+        renderUsers(cachedUsers);
+        return;
+      }
+
+      const filtered = cachedUsers.filter(x => {
+        const u = x.data;
+        return [
+          u.firstName || "",
+          u.lastName || "",
+          u.email || "",
+          u.dept || "",
+          u.role || "",
+          u.uid || ""
+        ]
+          .join(" ")
+          .toLowerCase()
+          .includes(q);
+      });
+
+      renderUsers(filtered);
+    });
   }
 
   // ---------- DASHBOARD PLACEHOLDERS ----------
@@ -389,13 +692,14 @@ const COMPANY_NAME = "Demo Company";
     if (dashQuickList) {
       dashQuickList.innerHTML = `
         <li>Stations loaded from company structure.</li>
-        <li>Call buttons now generate live URLs.</li>
+        <li>Roles and users are now company-scoped.</li>
+        <li>Call buttons generate live URLs.</li>
       `;
     }
   }
 
-  // ---------- FIRESTORE LISTENER ----------
-  function initStationsListener() {
+  // ---------- FIRESTORE LISTENERS ----------
+  function initListeners() {
     try {
       stationsRef.orderBy("name").onSnapshot(
         snapshot => {
@@ -408,14 +712,43 @@ const COMPANY_NAME = "Demo Company";
 
           renderStations(cachedStations);
           populateCallButtonStations(cachedStations);
+          populateDeptOptions();
         },
         err => {
-          console.error(err);
+          console.error("Stations listener error:", err);
           setConn(false);
         }
       );
+
+      rolesRef.orderBy("name").onSnapshot(
+        snapshot => {
+          cachedRoles = snapshot.docs.map(doc => ({
+            id: doc.id,
+            data: doc.data()
+          }));
+
+          renderRoles(cachedRoles);
+        },
+        err => {
+          console.error("Roles listener error:", err);
+        }
+      );
+
+      usersRef.orderBy("firstName").onSnapshot(
+        snapshot => {
+          cachedUsers = snapshot.docs.map(doc => ({
+            id: doc.id,
+            data: doc.data()
+          }));
+
+          renderUsers(cachedUsers);
+        },
+        err => {
+          console.error("Users listener error:", err);
+        }
+      );
     } catch (err) {
-      console.error("Station listener failed:", err);
+      console.error("Listener setup failed:", err);
       setConn(false);
     }
   }
@@ -426,7 +759,7 @@ const COMPANY_NAME = "Demo Company";
     initTabs();
     initPlaceholders();
     wireEvents();
-    initStationsListener();
+    initListeners();
   }
 
   if (document.readyState === "loading") {
