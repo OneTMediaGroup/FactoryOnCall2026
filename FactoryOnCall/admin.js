@@ -1,14 +1,10 @@
 // -------------------------------------------------------------
 // FACTORY ON CALL — ADMIN PANEL
-// Minimal Working Admin wired to current admin.html
+// Safe minimal working admin wired to current admin.html
 // -------------------------------------------------------------
 
 const COMPANY_ID = "demo-company";
 const COMPANY_NAME = "Demo Company";
-
-// ---------- FIRESTORE ----------
-const companyRef = db.collection("companies").doc(COMPANY_ID);
-const stationsRef = companyRef.collection("stations");
 
 // ---------- CONNECTION STATUS ----------
 const connDot = document.getElementById("firebaseStatusDot");
@@ -18,7 +14,6 @@ function setConn(ok) {
   if (connDot) connDot.style.background = ok ? "#22c55e" : "#ef4444";
   if (connLabel) connLabel.textContent = ok ? "Online" : "Offline";
 }
-setTimeout(() => setConn(true), 500);
 
 // ---------- SIDEBAR / TABS ----------
 const navItems = document.querySelectorAll(".nav-item");
@@ -69,14 +64,16 @@ function activateTab(tabName) {
   if (pageSubtitle) pageSubtitle.textContent = tabSubtitle(tabName);
 }
 
-navItems.forEach(btn => {
-  btn.addEventListener("click", () => {
-    const tabName = btn.dataset.tab;
-    if (tabName) activateTab(tabName);
+function initTabs() {
+  navItems.forEach(btn => {
+    btn.addEventListener("click", () => {
+      const tabName = btn.dataset.tab;
+      if (tabName) activateTab(tabName);
+    });
   });
-});
 
-activateTab("dashboard");
+  activateTab("dashboard");
+}
 
 // ---------- HELPERS ----------
 function buildCallUrl(stationName, cells) {
@@ -99,7 +96,7 @@ async function copyText(text) {
   }
 }
 
-// ---------- STATIONS TAB ----------
+// ---------- DOM ----------
 const stationsTableBody = document.getElementById("stationsTableBody");
 const stationSearch = document.getElementById("stationSearch");
 const stationForm = document.getElementById("stationForm");
@@ -111,8 +108,26 @@ const stationActive = document.getElementById("stationActive");
 const stationFormTitle = document.getElementById("stationFormTitle");
 const stationFormReset = document.getElementById("stationFormReset");
 
-let cachedStations = [];
+const cbStation = document.getElementById("cbStation");
+const cbCells = document.getElementById("cbCells");
+const cbDepartment = document.getElementById("cbDepartment");
+const cbOutput = document.getElementById("cbOutput");
+const btnGenerateDynamic = document.getElementById("btnGenerateDynamic");
+const btnCopyOutput = document.getElementById("btnCopyOutput");
 
+const cbAutoStation = document.getElementById("cbAutoStation");
+const cbAutoOutput = document.getElementById("cbAutoOutput");
+const btnGenerateAllDynamic = document.getElementById("btnGenerateAllDynamic");
+
+const statTotalCalls = document.getElementById("statTotalCalls");
+const statActiveCalls = document.getElementById("statActiveCalls");
+const statClosedCalls = document.getElementById("statClosedCalls");
+const dashQuickList = document.getElementById("dashQuickList");
+
+let cachedStations = [];
+let stationsRef = null;
+
+// ---------- STATIONS RENDER ----------
 function renderStations(rows) {
   if (!stationsTableBody) return;
 
@@ -146,11 +161,11 @@ function wireStationTableButtons() {
       if (!found) return;
 
       const s = found.data;
-      stationId.value = found.id;
-      stationName.value = s.name || "";
-      stationDescription.value = s.description || "";
-      stationCells.value = Array.isArray(s.cells) ? s.cells.join(",") : "";
-      stationActive.checked = !!s.active;
+      if (stationId) stationId.value = found.id;
+      if (stationName) stationName.value = s.name || "";
+      if (stationDescription) stationDescription.value = s.description || "";
+      if (stationCells) stationCells.value = Array.isArray(s.cells) ? s.cells.join(",") : "";
+      if (stationActive) stationActive.checked = !!s.active;
       if (stationFormTitle) stationFormTitle.textContent = "Edit Station";
       activateTab("stations");
     };
@@ -173,56 +188,6 @@ function wireStationTableButtons() {
   });
 }
 
-stationsRef.orderBy("name").onSnapshot(
-  snapshot => {
-    cachedStations = snapshot.docs.map(doc => ({
-      id: doc.id,
-      data: doc.data()
-    }));
-    renderStations(cachedStations);
-    populateCallButtonStations(cachedStations);
-  },
-  err => {
-    console.error(err);
-    setConn(false);
-  }
-);
-
-stationForm?.addEventListener("submit", async e => {
-  e.preventDefault();
-
-  const payload = {
-    companyId: COMPANY_ID,
-    name: stationName.value.trim(),
-    description: stationDescription.value.trim(),
-    cells: stationCells.value
-      .split(",")
-      .map(x => x.trim())
-      .filter(Boolean),
-    active: !!stationActive.checked,
-    updatedAt: Date.now()
-  };
-
-  if (!payload.name) {
-    alert("Station name is required.");
-    return;
-  }
-
-  try {
-    if (stationId.value) {
-      await stationsRef.doc(stationId.value).update(payload);
-    } else {
-      payload.createdAt = Date.now();
-      await stationsRef.add(payload);
-    }
-
-    resetStationForm();
-  } catch (err) {
-    console.error(err);
-    alert("Could not save station.");
-  }
-});
-
 function resetStationForm() {
   if (stationForm) stationForm.reset();
   if (stationId) stationId.value = "";
@@ -230,42 +195,7 @@ function resetStationForm() {
   if (stationActive) stationActive.checked = true;
 }
 
-stationFormReset?.addEventListener("click", resetStationForm);
-
-stationSearch?.addEventListener("input", () => {
-  const q = stationSearch.value.trim().toLowerCase();
-  if (!q) {
-    renderStations(cachedStations);
-    return;
-  }
-
-  const filtered = cachedStations.filter(x => {
-    const s = x.data;
-    return [
-      s.name || "",
-      s.description || "",
-      Array.isArray(s.cells) ? s.cells.join(" ") : ""
-    ]
-      .join(" ")
-      .toLowerCase()
-      .includes(q);
-  });
-
-  renderStations(filtered);
-});
-
-// ---------- CALL BUTTONS TAB ----------
-const cbStation = document.getElementById("cbStation");
-const cbCells = document.getElementById("cbCells");
-const cbDepartment = document.getElementById("cbDepartment");
-const cbOutput = document.getElementById("cbOutput");
-const btnGenerateDynamic = document.getElementById("btnGenerateDynamic");
-const btnCopyOutput = document.getElementById("btnCopyOutput");
-
-const cbAutoStation = document.getElementById("cbAutoStation");
-const cbAutoOutput = document.getElementById("cbAutoOutput");
-const btnGenerateAllDynamic = document.getElementById("btnGenerateAllDynamic");
-
+// ---------- CALL BUTTONS ----------
 function populateCallButtonStations(rows) {
   if (cbStation) cbStation.innerHTML = "";
   if (cbAutoStation) cbAutoStation.innerHTML = "";
@@ -286,7 +216,6 @@ function populateCallButtonStations(rows) {
   });
 
   populateCellsForSelectedStation();
-  populateCellsForAutoStation();
 }
 
 function populateCellsForSelectedStation() {
@@ -296,7 +225,6 @@ function populateCellsForSelectedStation() {
   const found = cachedStations.find(x => x.id === id);
 
   cbCells.innerHTML = "";
-
   if (!found) return;
 
   (found.data.cells || []).forEach(cell => {
@@ -307,56 +235,165 @@ function populateCellsForSelectedStation() {
   });
 }
 
-function populateCellsForAutoStation() {
-  // reserved for future use
+// ---------- FIRESTORE INIT ----------
+function initFirestore() {
+  if (typeof db === "undefined") {
+    console.error("db is not defined. Check firebase.js");
+    setConn(false);
+    return;
+  }
+
+  try {
+    const companyRef = db.collection("companies").doc(COMPANY_ID);
+    stationsRef = companyRef.collection("stations");
+
+    stationsRef.orderBy("name").onSnapshot(
+      snapshot => {
+        setConn(true);
+
+        cachedStations = snapshot.docs.map(doc => ({
+          id: doc.id,
+          data: doc.data()
+        }));
+
+        renderStations(cachedStations);
+        populateCallButtonStations(cachedStations);
+      },
+      err => {
+        console.error(err);
+        setConn(false);
+      }
+    );
+  } catch (err) {
+    console.error("Firestore init failed:", err);
+    setConn(false);
+  }
 }
 
-cbStation?.addEventListener("change", populateCellsForSelectedStation);
+// ---------- EVENT WIRING ----------
+function wireEvents() {
+  stationForm?.addEventListener("submit", async e => {
+    e.preventDefault();
 
-btnGenerateDynamic?.addEventListener("click", () => {
-  const stationIdValue = cbStation?.value;
-  const found = cachedStations.find(x => x.id === stationIdValue);
-  if (!found) {
-    alert("Select a station.");
-    return;
+    if (!stationsRef) {
+      alert("Stations collection is not ready.");
+      return;
+    }
+
+    const payload = {
+      companyId: COMPANY_ID,
+      name: stationName?.value.trim() || "",
+      description: stationDescription?.value.trim() || "",
+      cells: (stationCells?.value || "")
+        .split(",")
+        .map(x => x.trim())
+        .filter(Boolean),
+      active: !!stationActive?.checked,
+      updatedAt: Date.now()
+    };
+
+    if (!payload.name) {
+      alert("Station name is required.");
+      return;
+    }
+
+    try {
+      if (stationId?.value) {
+        await stationsRef.doc(stationId.value).update(payload);
+      } else {
+        payload.createdAt = Date.now();
+        await stationsRef.add(payload);
+      }
+
+      resetStationForm();
+    } catch (err) {
+      console.error(err);
+      alert("Could not save station.");
+    }
+  });
+
+  stationFormReset?.addEventListener("click", resetStationForm);
+
+  stationSearch?.addEventListener("input", () => {
+    const q = stationSearch.value.trim().toLowerCase();
+    if (!q) {
+      renderStations(cachedStations);
+      return;
+    }
+
+    const filtered = cachedStations.filter(x => {
+      const s = x.data;
+      return [
+        s.name || "",
+        s.description || "",
+        Array.isArray(s.cells) ? s.cells.join(" ") : ""
+      ]
+        .join(" ")
+        .toLowerCase()
+        .includes(q);
+    });
+
+    renderStations(filtered);
+  });
+
+  cbStation?.addEventListener("change", populateCellsForSelectedStation);
+
+  btnGenerateDynamic?.addEventListener("click", () => {
+    const stationIdValue = cbStation?.value;
+    const found = cachedStations.find(x => x.id === stationIdValue);
+    if (!found) {
+      alert("Select a station.");
+      return;
+    }
+
+    const selectedCells = Array.from(cbCells.selectedOptions).map(o => o.value);
+    const url = buildCallUrl(found.data.name || "", selectedCells);
+
+    if (cbOutput) cbOutput.value = url;
+  });
+
+  btnCopyOutput?.addEventListener("click", async () => {
+    if (!cbOutput?.value) return;
+    await copyText(cbOutput.value);
+  });
+
+  btnGenerateAllDynamic?.addEventListener("click", () => {
+    const stationIdValue = cbAutoStation?.value;
+    const found = cachedStations.find(x => x.id === stationIdValue);
+    if (!found) {
+      alert("Select a station.");
+      return;
+    }
+
+    const cells = found.data.cells || [];
+    const lines = cells.map(cell => buildCallUrl(found.data.name || "", [cell]));
+    if (cbAutoOutput) cbAutoOutput.value = lines.join("\n");
+  });
+}
+
+// ---------- DASHBOARD PLACEHOLDERS ----------
+function initPlaceholders() {
+  if (statTotalCalls) statTotalCalls.textContent = "0";
+  if (statActiveCalls) statActiveCalls.textContent = "0";
+  if (statClosedCalls) statClosedCalls.textContent = "0";
+  if (dashQuickList) {
+    dashQuickList.innerHTML = `
+      <li>Stations loaded from company structure.</li>
+      <li>Call buttons now generate live URLs.</li>
+    `;
   }
+}
 
-  const selectedCells = Array.from(cbCells.selectedOptions).map(o => o.value);
-  const url = buildCallUrl(found.data.name || "", selectedCells);
+// ---------- BOOT ----------
+function boot() {
+  initTabs();
+  initPlaceholders();
+  wireEvents();
+  initFirestore();
+}
 
-  if (cbOutput) cbOutput.value = url;
-});
-
-btnCopyOutput?.addEventListener("click", async () => {
-  if (!cbOutput?.value) return;
-  await copyText(cbOutput.value);
-});
-
-btnGenerateAllDynamic?.addEventListener("click", () => {
-  const stationIdValue = cbAutoStation?.value;
-  const found = cachedStations.find(x => x.id === stationIdValue);
-  if (!found) {
-    alert("Select a station.");
-    return;
-  }
-
-  const cells = found.data.cells || [];
-  const lines = cells.map(cell => buildCallUrl(found.data.name || "", [cell]));
-  if (cbAutoOutput) cbAutoOutput.value = lines.join("\n");
-});
-
-// ---------- PLACEHOLDER COUNTS ON DASHBOARD ----------
-const statTotalCalls = document.getElementById("statTotalCalls");
-const statActiveCalls = document.getElementById("statActiveCalls");
-const statClosedCalls = document.getElementById("statClosedCalls");
-const dashQuickList = document.getElementById("dashQuickList");
-
-if (statTotalCalls) statTotalCalls.textContent = "0";
-if (statActiveCalls) statActiveCalls.textContent = "0";
-if (statClosedCalls) statClosedCalls.textContent = "0";
-if (dashQuickList) {
-  dashQuickList.innerHTML = `
-    <li>Stations loaded from company structure.</li>
-    <li>Call buttons now generate live URLs.</li>
-  `;
+if (document.readyState === "loading") {
+  document.addEventListener("DOMContentLoaded", boot, { once: true });
+} else {
+  boot();
 }
