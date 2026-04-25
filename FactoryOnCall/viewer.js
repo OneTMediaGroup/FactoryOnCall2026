@@ -36,7 +36,7 @@ const COMPANY_ID = "demo-company"; // later dynamic
   }
 
   const firebaseConfig = {
-    apiKey: "AIzaSyD5n-Ykf5LoYE_2u0pbRKfektav75GZIZE",
+    apiKey: "AIzaSyDvYKD_86HjtZq381m0uZSNn0pTjWNydAs",
     authDomain: "factoryoncall.firebaseapp.com",
     projectId: "factoryoncall",
     storageBucket: "factoryoncall.firebasestorage.app",
